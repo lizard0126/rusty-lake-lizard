@@ -32,7 +32,6 @@ interface Room {
   description: string;
   image?: string;
   locked: boolean;
-  puzzleSolved: boolean;
 }
 
 const rooms: Room[] = [
@@ -42,31 +41,27 @@ const rooms: Room[] = [
     description: '这是一个黑暗的、方形的、铺着白色瓷砖的房间。',
     image: images.bedroom,
     locked: false,
-    puzzleSolved: false,
   },
   {
     id: 'corridor',
     name: '走廊',
-    description: '你走进一条长长的、昏暗的走廊，尽头分成两条岔路。',
+    description: '这是一条长长的、昏暗的走廊，尽头分成两条岔路。',
     image: images.corridor,
     locked: true,
-    puzzleSolved: false,
   },
   {
     id: 'kitchen',
     name: '厨房',
-    description: '厨房里摆着一张桌子和一个厨台。',
+    description: '这里摆着一张桌子和一个厨台。',
     image: images.kitchen,
     locked: false,
-    puzzleSolved: false,
   },
   {
     id: 'laboratory',
     name: '化学实验室',
-    description: '化学实验室出奇地空旷——里面只有一个小型实验台立在房间中央，上面摆着少量化学设备。',
+    description: '这里出奇的空旷——里面只有一个小型实验台立在房间中央，上面摆着少量化学设备。',
     image: images.laboratory,
     locked: false,
-    puzzleSolved: false,
   },
   {
     id: 'electrical',
@@ -74,23 +69,20 @@ const rooms: Room[] = [
     description: '空气中弥漫着一股霉味，天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。',
     image: images.electrical,
     locked: true,
-    puzzleSolved: false,
   },
   {
     id: 'office',
     name: '办公室',
-    description: '进入房间，简朴干净的白色墙纸与遍布整座设施的冰冷单调的白色瓷砖形成了鲜明的对比。房间中央有一张桌子，上面放着一台电脑，发出轻微的电流声。',
+    description: '简朴干净的白色墙纸与遍布整座设施的冰冷单调的白色瓷砖形成了鲜明的对比。房间中央有一张桌子，上面放着一台电脑，发出轻微的电流声。',
     image: images.office,
     locked: true,
-    puzzleSolved: false,
   },
   {
     id: 'hide',
     name: '隐藏房间',
-    description: '你从布满灰尘的通风口爬出来，到了一个黑暗房间的冰冷地板上。嵌入进墙体里的巨型机器矗立在你眼前，一个小屏幕发出红光，显示着闪烁的消息。',
+    description: '从布满灰尘的通风口爬出来，到了一个黑暗房间的冰冷地板上。嵌入进墙体里的巨型机器矗立在你眼前，一个小屏幕发出红光，显示着闪烁的消息。',
     image: images.hide,
     locked: true,
-    puzzleSolved: false,
   },
 ];
 
@@ -187,15 +179,17 @@ const itemsDetails = {
 
 interface GameState {
   id: string;
+  gameId: string;
   gameName: string;
   currentRoom: string;
   inventory: string[];
   visitedRooms: string[];
-  roomStates: Record<string, { locked: boolean; puzzleSolved: boolean }>;
+  doneTasks: string[];
 }
 
 interface PlayerState {
   id: string;
+  gameId: string;
   userId: string;
 }
 
@@ -206,21 +200,29 @@ declare module 'koishi' {
   }
 }
 
-export function apply(ctx: Context, config: Config) {
+export function apply(ctx: Context) {
   const logger = ctx.logger('rusty-lake');
 
   ctx.model.extend('rusty_lake_games', {
     id: 'string',
+    gameId: 'string',
     gameName: 'string',
     currentRoom: 'string',
     inventory: 'json',
     visitedRooms: 'json',
-    roomStates: 'json',
+    doneTasks: 'json'
+  }, {
+    primary: 'id',
+    autoInc: true,
   });
 
   ctx.model.extend('rusty_lake_players', {
     id: 'string',
+    gameId: 'string',
     userId: 'string',
+  }, {
+    primary: 'id',
+    autoInc: true,
   });
 
   const command = ctx.command('锈湖', '锈湖桌游');
@@ -229,16 +231,16 @@ export function apply(ctx: Context, config: Config) {
     const player = await ctx.database.get('rusty_lake_players', { userId: session.userId });
     if (!player.length) throw new Error('你还未加入任何游戏。');
 
-    const game = await ctx.database.get('rusty_lake_games', { id: player[0].id });
+    const game = await ctx.database.get('rusty_lake_games', { gameId: player[0].gameId });
     if (!game.length) throw new Error('对局数据不存在。');
 
     return {
       ...game[0],
       visitedRooms: game[0].visitedRooms || [],
-      roomStates: game[0].roomStates || {},
     };
   }
 
+  let currentId = 1;
   command
     .subcommand('.新建', '新建游戏房间')
     .action(async ({ session }) => {
@@ -265,20 +267,26 @@ export function apply(ctx: Context, config: Config) {
         return '已经存在同名的房间，请换一个名称。';
       }
 
-      const id = `game-${Date.now()}`;
+      const gameId = `game-${Date.now()}`;
+
+      const players = await ctx.database.get('rusty_lake_players', {});
+      const maxId = players.reduce((max, player) => Math.max(max, parseInt(player.id, 10)), 0);
+      const id = maxId + 1;
 
       await ctx.database.create('rusty_lake_games', {
-        id: id,
+        id: id.toString(),
+        gameId: gameId,
         gameName,
         currentRoom: 'bedroom',
         inventory: [],
-        visitedRooms: [],
-        roomStates: {},
+        visitedRooms: ['bedroom'],
+        doneTasks: [],
       });
 
       await ctx.database.upsert('rusty_lake_players', [
         {
-          id: id,
+          id: id.toString(),
+          gameId: gameId,
           userId: session.userId,
         },
       ]);
@@ -306,11 +314,12 @@ export function apply(ctx: Context, config: Config) {
 
       if (index === 0) {
         for (const game of games) {
-          await ctx.database.remove('rusty_lake_games', { id: game.id });
-          await ctx.database.remove('rusty_lake_players', { id: game.id });
+          await ctx.database.remove('rusty_lake_games', { gameId: game.gameId });
+          await ctx.database.remove('rusty_lake_players', { gameId: game.gameId });
           logger.info(`删除了游戏 ${game.gameName} 的记录。`);
         }
         await session.send('所有房间记录已成功删除。');
+        currentId = 1;
         return;
       }
 
@@ -318,11 +327,11 @@ export function apply(ctx: Context, config: Config) {
         return '无效的选择，请重新输入：';
       }
 
-      const id = games[index - 1].id;
+      const gameId = games[index - 1].gameId;
       const gameName = games[index - 1].gameName;
 
-      await ctx.database.remove('rusty_lake_games', { id });
-      await ctx.database.remove('rusty_lake_players', { id: id });
+      await ctx.database.remove('rusty_lake_games', { gameId });
+      await ctx.database.remove('rusty_lake_players', { gameId: gameId });
 
       await session.send(`游戏 ${gameName} 的记录已成功删除。`);
     });
@@ -331,7 +340,6 @@ export function apply(ctx: Context, config: Config) {
     .subcommand('.加入', '加入现有游戏房间')
     .action(async ({ session }) => {
       const games = await ctx.database.get('rusty_lake_games', {});
-
       if (games.length === 0) return '当前没有任何房间可以加入。';
 
       const existingPlayer = await ctx.database.get('rusty_lake_players', { userId: session.userId });
@@ -346,17 +354,21 @@ export function apply(ctx: Context, config: Config) {
       if (!selected) return '输入超时，加入操作失败。';
 
       const index = parseInt(selected.trim(), 10) - 1;
-
       if (isNaN(index) || index < 0 || index >= games.length) {
         return '无效的选择，请重新输入：';
       }
 
-      const id = games[index].id;
+      const gameId = games[index].gameId;
 
-      await ctx.database.upsert('rusty_lake_players', [
-        { userId: session.userId, id },
-      ]);
+      const players = await ctx.database.get('rusty_lake_players', {});
+      const maxId = players.reduce((max, player) => Math.max(max, parseInt(player.id, 10)), 0);
+      const id = maxId + 1;
 
+      await ctx.database.create('rusty_lake_players', {
+        id: id.toString(),
+        gameId: gameId,
+        userId: session.userId,
+      });
       await session.send(`你成功加入了房间：${games[index].gameName}！`);
     });
 
@@ -390,15 +402,57 @@ export function apply(ctx: Context, config: Config) {
       await ctx.database.upsert('rusty_lake_games', [
         {
           id: state.id,
+          gameId: state.gameId,
           gameName: state.gameName,
           currentRoom: targetRoom.id,
           inventory: state.inventory,
-          visitedRooms: [...state.visitedRooms, targetRoom.id],
-          roomStates: state.roomStates,
+          visitedRooms: state.visitedRooms,
+          doneTasks: state.doneTasks,
         },
       ]);
 
       return `你进入了${targetRoom.name}。\n${targetRoom.description}${targetRoom.image ? '\n' + h.image(targetRoom.image) : ''}`;
+    });
+
+  command
+    .subcommand('.房间', '查看已访问的房间地图')
+    .action(async ({ session }) => {
+      const state = await getPlayerState(session);
+      const visitedRooms = state.visitedRooms || [];
+      const currentRoom = state.currentRoom;
+
+      const allVisitedRooms = [currentRoom, ...visitedRooms];
+
+      let roomList = '你已经访问过以下房间，选择一个查看详细信息：\n';
+      allVisitedRooms.forEach((roomId, index) => {
+        const room = rooms.find(r => r.id === roomId);
+        if (room) {
+          roomList += `${index + 1}. ${room.name}\n`;
+        }
+      });
+
+      roomList += '\n请输入房间编号查看详细信息：';
+
+      await session.send(roomList);
+
+      const choice = await session.prompt(10000);
+      const selectedRoomIndex = parseInt(choice) - 1;
+
+      if (isNaN(selectedRoomIndex) || selectedRoomIndex < 0 || selectedRoomIndex >= allVisitedRooms.length) {
+        return '无效的选择，请重试。';
+      }
+
+      const selectedRoomId = allVisitedRooms[selectedRoomIndex];
+      const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+
+      if (selectedRoom) {
+        let response = `你想起了${selectedRoom.name}的样子\n`;
+        response += selectedRoom.description + '\n';
+        response += h.image(selectedRoom.image);
+        await session.send(response);
+      } else {
+        return '无法找到该房间的详细信息。';
+      }
     });
 
   async function addItemToInventory(session: Session, item: string) {
@@ -407,13 +461,50 @@ export function apply(ctx: Context, config: Config) {
     await ctx.database.upsert('rusty_lake_games', [
       {
         id: state.id,
+        gameId: state.gameId,
         gameName: state.gameName,
         currentRoom: state.currentRoom,
         inventory: newInventory,
         visitedRooms: state.visitedRooms,
-        roomStates: state.roomStates,
+        doneTasks: state.doneTasks,
       },
     ]);
+  }
+
+  async function removeItemFromInventory(session: Session, item: string) {
+    const state = await getPlayerState(session);
+    const newInventory = state.inventory.filter(i => i !== item);
+    await ctx.database.upsert('rusty_lake_games', [
+      {
+        id: state.id,
+        gameId: state.gameId,
+        gameName: state.gameName,
+        currentRoom: state.currentRoom,
+        inventory: newInventory,
+        visitedRooms: state.visitedRooms,
+        doneTasks: state.doneTasks,
+      },
+    ]);
+
+    async function completeTask(session: Session, taskId: string) {
+      const state = await getPlayerState(session);
+      const newtasks = [...state.inventory, taskId];
+      await ctx.database.upsert('rusty_lake_games', [
+        {
+          id: state.id,
+          gameId: state.gameId,
+          gameName: state.gameName,
+          currentRoom: state.currentRoom,
+          inventory: state.inventory,
+          visitedRooms: state.visitedRooms,
+          doneTasks: newtasks,
+        },
+      ]);
+
+      return `任务：${taskId} 完成！`;
+    }
+
+    return `${item} 已从你的背包中移除。`;
   }
 
   command
@@ -424,110 +515,223 @@ export function apply(ctx: Context, config: Config) {
 
       let response = '';
 
-      if (currentRoom.id === 'bedroom') {
-        if (/床/.test(point)) {
-          response += '你在床铺的垫子下发现了半张纸条。';
-          await addItemToInventory(session, '半张纸条a');
-          response += '\n你获得了半张纸条';
-        } else if (/柜/.test(point)) {
-          response += '';
-        } else if (/地毯/.test(point)) {
-          response += '';
-        } else if (/门/.test(point)) {
-          response += '';
-        } else if (/开关/.test(point)) {
-          response += '';
-        } else if (/监控/.test(point) || /摄像/.test(point)) {
-          response += '';
-        } else if (/通风口/.test(point)) {
-          response += '';
+      if (point === '上锁的盒子') {
+        if (state.inventory.includes('半张纸条a') && state.inventory.includes('半张纸条b') && state.inventory.includes('隐藏密码线索')) {
+          if (!state.inventory.includes('钥匙')) {
+            await session.send('你似乎收集到了足够的线索，要试试打开盒子吗？（是/否）');
+            const choice = await session.prompt(10000);
+            if (choice === '是') {
+              await session.send('输入五位数字密码：');
+              const choice = await session.prompt(10000);
+              if (choice === '26773') {
+                response += '\n\n你打开了盒子，里面只有一把钥匙。\n（可在物品指令中查看）';
+                response += '\n\n你丢掉了没用的空盒子。';
+                await addItemToInventory(session, '钥匙');
+                await removeItemFromInventory(session, '上锁的盒子');
+              } else {
+                return '锁并未解开。是输错了吗？';
+              }
+            } else {
+              return '你迟疑着，没有动作。';
+            }
+          } else {
+            response += '没有特别的发现了。';
+          }
+        } else {
+          return '你还没有收集到足够的线索。';
+        }
+      } else if (/2/.test(point)) {
+        response += '';
+      } else {
+        if (currentRoom.id === 'bedroom') {
+          if (/床/.test(point)) {
+            response += '很简单的上下床，有多少人都能睡下。';
+            if (!state.inventory.includes('半张纸条a')) {
+              response += '\n\n你在床铺的垫子下发现了半张纸条。\n（可在物品指令中查看）';
+              response += h.image(images.notea);
+              await addItemToInventory(session, '半张纸条a');
+            } else {
+              response += '\n\n没有特别的发现了。';
+            }
+
+          } else if (/柜/.test(point) || /抽屉/.test(point)) {
+            await session.send('一张小巧而简单的柜子靠墙而立，有三个抽屉。要拉开看看吗？（是/否）');
+            const choice = await session.prompt(10000);
+            if (choice === '是') {
+              if (!state.inventory.includes('手电筒')) {
+                response += '\n\n顶部的抽屉内有一个上锁的盒子。\n（可在物品指令中查看）';
+                await addItemToInventory(session, '上锁的盒子');
+                response += '\n\n中间的抽屉内有纸条的另一半。\n（可在物品指令中查看）';
+                response += h.image(images.noteb);
+                await addItemToInventory(session, '半张纸条b');
+                response += '\n\n底部的抽屉内有一个手电筒。 ';
+                await addItemToInventory(session, '手电筒');
+              }
+            } else {
+              return '你迟疑着，没有动作。';
+            }
+
+          } else if (/地毯/.test(point)) {
+            await session.send('整洁的地毯，下面的地面上似乎写了什么。环境太过昏暗，你看不清。');
+            if (state.inventory.includes('手电筒')) {
+              await session.send('你拥有手电筒。要打开照明吗？（是/否）');
+              const choice = await session.prompt(10000);
+              if (choice === '是') {
+                if (!state.inventory.includes('隐藏密码线索')) {
+                  response += '\n\n地上刻画着一些字符，似乎是什么密码的线索。\n（可在物品指令中查看）';
+                  response += h.image(images.code);
+                  await addItemToInventory(session, '隐藏密码线索');
+                } else {
+                  response += '\n\n没有特别的发现了。';
+                }
+              }
+              else {
+                return '你迟疑着，没有动作。';
+              }
+            }
+
+          } else if (/门/.test(point)) {
+            const corridor = rooms.find(room => room.id === 'corridor');
+            if (corridor.locked = true) {
+              await session.send('这扇装有坚固的金属门把手的白门被锁上了，需要钥匙才能开。');
+              if (state.inventory.includes('钥匙')) {
+                await session.send('你拥有钥匙。要试着开门吗？（是/否）');
+                const choice = await session.prompt(10000);
+                if (choice === '是') {
+                  corridor.locked = false;
+                  const player = await ctx.database.get('rusty_lake_players', { userId: session.userId });
+                  const id = player[0].id;
+                  await ctx.database.upsert('rusty_lake_games', [
+                    {
+                      id,
+                      currentRoom: 'corridor',
+                      visitedRooms: [...state.visitedRooms, 'corridor'],
+                    },
+                  ]);
+                  response += '\n\n你小心翼翼地打开门，迈步走了出去。';
+                  response += '\n你走进一条长长的、昏暗的走廊，尽头分成两条岔路。';
+                  response += '\n你发现墙上钉着一张地图，旁边是你进入的地方。地图描绘了包括你刚刚走出来的房间在内的所有房间。';
+                  response += h.image(images.corridor);
+                  response += '\n\n在走廊的尽头，你看到墙上写着些什么。那是用黑色马克笔写着一条信息：\n\n“是时候醒来了。';
+                } else {
+                  return '你迟疑着，没有动作。';
+                }
+              }
+            } else {
+              response += '这扇门已经打开，你随时可以离开。';
+            }
+
+          } else if (/开关/.test(point)) {
+            if (!state.doneTasks.includes('电力')) {
+              response += '你打开开关，电灯发出惨白的光亮。';
+            } else {
+              return '你反复拨弄开关，但没有任何反应。这里似乎停电了。';
+            }
+
+          } else if (/监控/.test(point) || /摄像/.test(point)) {
+            response += '摄像头静止地悬挂在天花板上，以一种令人不安的姿态注视着你。';
+            response += '你试着拨弄它，但它坚固的金属框架可以使它免受任何损害。';
+
+          } else if (/通风口/.test(point)) {
+            await session.send('通风口被一块挡板覆盖，挡板被螺丝固定在墙上。');
+            if (!state.inventory.includes('螺丝刀')) {
+              await session.send('你拥有螺丝刀。要试着拆开挡板吗？（是/否）');
+              const choice = await session.prompt(10000);
+              if (choice === '是') {
+                response += '通风口内幽暗昏聩，似乎是个迷宫。';
+              } else {
+                return '你迟疑着，没有动作。';
+              }
+            } else {
+              response += '没有特别的发现了。';
+            }
+          }
+        }
+
+        if (currentRoom.id === 'corridor') {
+          if (/厨房/.test(point)) {
+            response += '';
+          } else if (/化学实验室/.test(point)) {
+            response += '';
+          } else if (/电/.test(point)) {
+            response += '';
+          } else if (/办公室/.test(point)) {
+            response += '';
+          }
+        }
+
+        if (currentRoom.id === 'kitchen') {
+          if (/衣/.test(point) || /外套/.test(point)) {
+            response += '';
+          } else if (/水槽/.test(point) || /水池/.test(point)) {
+            response += '';
+          } else if (/咖啡机/.test(point)) {
+            response += '';
+          } else if (/柜/.test(point)) {
+            response += '';
+          } else if (/垃圾桶/.test(point)) {
+            response += '';
+          } else if (/箱/.test(point)) {
+            response += '';
+          } else if (/电话/.test(point)) {
+            response += '';
+          } else if (/通风口/.test(point)) {
+            response += '';
+          } else if (/监控/.test(point) || /摄像/.test(point)) {
+            response += '';
+          }
+        }
+
+        if (currentRoom.id === 'laboratory') {
+          if (/实验台/.test(point)) {
+            response += '';
+          } else if (/通风口/.test(point)) {
+            response += '';
+          }
+        }
+
+        if (currentRoom.id === 'electrical') {
+          if (/保险丝盒/.test(point) || /柜/.test(point)) {
+            response += '';
+          } else if (/架/.test(point)) {
+            response += '';
+          } else if (/管道/.test(point)) {
+            response += '';
+          } else if (/通风口/.test(point)) {
+            response += '';
+          } else if (/污渍/.test(point) || /黑/.test(point) || /水/.test(point)) {
+            response += '';
+          }
+        }
+
+        if (currentRoom.id === 'office') {
+          if (/桌/.test(point)) {
+            response += '';
+          } else if (/抽屉/.test(point)) {
+            response += '';
+          } else if (/电脑/.test(point)) {
+            response += '';
+          } else if (/架/.test(point)) {
+            response += '';
+          } else if (/海报/.test(point) || /画/.test(point)) {
+            response += '';
+          } else if (/通风口/.test(point)) {
+            response += '';
+          }
+        }
+
+        if (currentRoom.id === 'hide') {
+          if (/机器/.test(point) || /门/.test(point)) {
+            response += '';
+          } else if (/海报/.test(point) || /画/.test(point)) {
+            response += '';
+          } else if (/按钮/.test(point)) {
+            response += '';
+          } else if (/纸/.test(point) || /地/.test(point)) {
+            response += '';
+          }
         }
       }
-
-      if (currentRoom.id === 'corridor') {
-        if (/厨房/.test(point)) {
-          response += '';
-        } else if (/化学实验室/.test(point)) {
-          response += '';
-        } else if (/电/.test(point)) {
-          response += '';
-        } else if (/办公室/.test(point)) {
-          response += '';
-        }
-      }
-
-      if (currentRoom.id === 'kitchen') {
-        if (/衣/.test(point) || /外套/.test(point)) {
-          response += '';
-        } else if (/水槽/.test(point) || /水池/.test(point)) {
-          response += '';
-        } else if (/咖啡机/.test(point)) {
-          response += '';
-        } else if (/柜/.test(point)) {
-          response += '';
-        } else if (/垃圾桶/.test(point)) {
-          response += '';
-        } else if (/箱/.test(point)) {
-          response += '';
-        } else if (/电话/.test(point)) {
-          response += '';
-        } else if (/通风口/.test(point)) {
-          response += '';
-        } else if (/监控/.test(point) || /摄像/.test(point)) {
-          response += '';
-        }
-      }
-
-      if (currentRoom.id === 'laboratory') {
-        if (/实验台/.test(point)) {
-          response += '';
-        } else if (/通风口/.test(point)) {
-          response += '';
-        }
-      }
-
-      if (currentRoom.id === 'electrical') {
-        if (/保险丝盒/.test(point) || /柜/.test(point)) {
-          response += '';
-        } else if (/架/.test(point)) {
-          response += '';
-        } else if (/管道/.test(point)) {
-          response += '';
-        } else if (/通风口/.test(point)) {
-          response += '';
-        } else if (/污渍/.test(point) || /黑/.test(point) || /水/.test(point)) {
-          response += '';
-        }
-      }
-
-      if (currentRoom.id === 'office') {
-        if (/桌/.test(point)) {
-          response += '';
-        } else if (/抽屉/.test(point)) {
-          response += '';
-        } else if (/电脑/.test(point)) {
-          response += '';
-        } else if (/架/.test(point)) {
-          response += '';
-        } else if (/海报/.test(point) || /画/.test(point)) {
-          response += '';
-        } else if (/通风口/.test(point)) {
-          response += '';
-        }
-      }
-
-      if (currentRoom.id === 'hide') {
-        if (/机器/.test(point) || /门/.test(point)) {
-          response += '';
-        } else if (/海报/.test(point) || /画/.test(point)) {
-          response += '';
-        } else if (/按钮/.test(point)) {
-          response += '';
-        } else if (/纸/.test(point) || /地/.test(point)) {
-          response += '';
-        }
-      }
-
       if (!response) {
         response = `你观察了一会${point}，并没有什么特别的发现。`;
       }
@@ -547,7 +751,7 @@ export function apply(ctx: Context, config: Config) {
       const itemList = state.inventory.map((item, index) => `${index + 1}: ${item}`).join('\n');
       await session.send(`你拥有的物品有：\n${itemList}\n请输入物品的编号查看详细信息，输入 0 取消。`);
 
-      const selected = await session.prompt(10000);
+      const selected = await session.prompt(15000);
 
       if (!selected) {
         return '输入超时，操作失败。';
@@ -579,20 +783,38 @@ export function apply(ctx: Context, config: Config) {
     });
 
   command
-    .subcommand('.测试', '测试')
+    .subcommand('.测试1', '测试')
     .action(async ({ session }) => {
-      if (!session?.userId) return '无法识别用户，请检查登录状态。';
-
       const player = await ctx.database.get('rusty_lake_players', { userId: session.userId });
       if (player.length === 0) return '你还未加入任何游戏，请使用“新建游戏”或“加入游戏”指令。';
 
       const id = player[0].id;
-
       await ctx.database.upsert('rusty_lake_games', [
         {
           id,
-          inventory: ['钥匙'],
+          inventory: ["半张纸条a", "上锁的盒子", "半张纸条b", "手电筒", "隐藏密码线索", "钥匙"],
           visitedRooms: ['bedroom', 'corridor', 'kitchen', 'laboratory', 'electrical', 'office', 'hide'],
+          doneTasks: [],
+        },
+      ]);
+
+      await session.send(`修改成功`);
+    });
+
+  command
+    .subcommand('.测试2', '测试')
+    .action(async ({ session }) => {
+      const player = await ctx.database.get('rusty_lake_players', { userId: session.userId });
+      if (player.length === 0) return '你还未加入任何游戏，请使用“新建游戏”或“加入游戏”指令。';
+
+      const id = player[0].id;
+      await ctx.database.upsert('rusty_lake_games', [
+        {
+          id,
+          currentRoom: 'bedroom',
+          inventory: ["半张纸条a", "半张纸条b", "手电筒", "隐藏密码线索", "钥匙"],
+          visitedRooms: ['bedroom'],
+          doneTasks: [],
         },
       ]);
 
