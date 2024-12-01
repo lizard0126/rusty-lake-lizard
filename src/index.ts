@@ -113,7 +113,7 @@ const itemsDetails = {
   },
   '身份证': {
     image: '',
-    description: '。上面的照片已经褪色，但名字写着“R. Vanderboom”。',
+    description: '上面的照片已经褪色，但名字写着“R. Vanderboom”。',
   },
   '滤纸': {
     image: '',
@@ -139,6 +139,10 @@ const itemsDetails = {
     image: images.description,
     description: '一本写有实验说明的笔记本。',
   },
+  '烧杯': {
+    image: '',
+    description: '一个普通的烧杯，似乎可以用来做实验。',
+  },
   '火柴盒': {
     image: '',
     description: '里面有一些火柴，数量充足。',
@@ -150,6 +154,14 @@ const itemsDetails = {
   '手': {
     image: '',
     description: '不断抽搐着的断手。',
+  },
+  '黑色混合物': {
+    image: '',
+    description: '蠕动着的黏糊糊的物质。',
+  },
+  '保险丝盒': {
+    image: images.fuse,
+    description: '巨大的保险丝盒连接着许多管道和电线，似乎控制着房间的电力。',
   },
   '扳手': {
     image: '',
@@ -552,8 +564,33 @@ export function apply(ctx: Context) {
           return '你还没有收集到足够的线索。';
         }
 
-      } else if (/2/.test(point)) {
-        response += '';
+      } else if (point === '实验说明') {
+        await session.send('你打开笔记本，上面似乎是某个实验的说明。');
+        await session.send(h.image(images.description));
+        if (!state.inventory.includes('黑色混合物') && !state.inventory.includes('手')) {
+          if (state.doneTasks.includes('水') && state.doneTasks.includes('酸') && state.inventory.includes('咖啡') && state.inventory.includes('肉') && state.inventory.includes('烧杯')) {
+            await session.send('你似乎收集到了足够的材料，要试试这个实验吗？（是/否）');
+            const choice = await session.prompt(10000);
+            if (choice === '是') {
+              response += '你拿出烧杯，对照着实验说明开始加入材料。';
+              response += '\n\n首先来到厨房，往烧杯里加了四分之一的水。';
+              response += '\n\n又前往电气室，往烧杯里加了四分之一的酸。';
+              response += '\n\n拿出之前泡好的咖啡倒了进去，又加入了冷藏箱里获得的肉。';
+              response += '\n\n回到化学实验室，将这一杯不可名状的物质搅拌了一会，变成了一杯奇怪的黑色混合物。\n（可在物品指令中查看）';
+              await removeItemFromInventory(session, '烧杯');
+              await removeItemFromInventory(session, '咖啡');
+              await addItemToInventory(session, '咖啡杯');
+              await removeItemFromInventory(session, '肉');
+              await addItemToInventory(session, '黑色混合物');
+            } else {
+              return '你迟疑着，没有动作。';
+            }
+          } else {
+            return '你还没有收集到足够的材料。';
+          }
+        } else {
+          response += '你已经做过这个实验了。';
+        }
 
       } else {
         if (currentRoom.id === 'bedroom') {
@@ -568,10 +605,11 @@ export function apply(ctx: Context) {
             }
 
           } else if (/柜/.test(point) || /抽屉/.test(point)) {
-            await session.send('一张小巧而简单的柜子靠墙而立，有三个抽屉。要拉开看看吗？（是/否）');
-            const choice = await session.prompt(10000);
-            if (choice === '是') {
-              if (!state.inventory.includes('手电筒')) {
+            await session.send('一张小巧而简单的柜子靠墙而立，有三个抽屉。');
+            if (!state.inventory.includes('手电筒')) {
+              await session.send('要拉开看看吗？（是/否）');
+              const choice = await session.prompt(10000);
+              if (choice === '是') {
                 response += '顶部的抽屉内有一个上锁的盒子。\n（可在物品指令中查看）';
                 await addItemToInventory(session, '上锁的盒子');
                 response += '\n\n中间的抽屉内有纸条的另一半。\n（可在物品指令中查看）';
@@ -579,9 +617,11 @@ export function apply(ctx: Context) {
                 await addItemToInventory(session, '半张纸条b');
                 response += '\n\n底部的抽屉内有一个手电筒。\n（可在物品指令中查看）';
                 await addItemToInventory(session, '手电筒');
+              } else {
+                return '你迟疑着，没有动作。';
               }
             } else {
-              return '你迟疑着，没有动作。';
+              return '没有特别的发现。';
             }
 
           } else if (/地毯/.test(point)) {
@@ -642,7 +682,7 @@ export function apply(ctx: Context) {
 
           } else if (/开关/.test(point)) {
             response += '老式的电灯开关。';
-            if (state.doneTasks.includes('电力')) {
+            if (state.doneTasks.includes('房间电')) {
               response += '\n\n你打开开关，电灯发出惨白的光亮。';
             } else {
               response += '\n\n你反复拨弄开关，但没有任何反应。这里似乎停电了。';
@@ -666,7 +706,7 @@ export function apply(ctx: Context) {
                     msg += '你细细思忖，好像有什么东西可以用在这里。猛然间，你想起了在办公室拿到的指示图：';
                     msg += h.image(images.diagram);
                     msg += '\n\n你在迷宫里仔细探索摸路，终于明白自己进来的地方对应着方块1。';
-                    msg += '\n\n（图里的方块从上到下从左到右分别为123456）';
+                    msg += '\n（图里的方块从上到下从左到右分别为123456）';
                     msg += '\n\n你想了想，觉得哪里不对。（输入你觉得有问题的编号）';
                     await session.send(msg);
                     const choice = await session.prompt(10000);
@@ -690,7 +730,7 @@ export function apply(ctx: Context) {
                       return '你想了想，好像没什么奇怪的。保险起见，你退了出来，装回了挡板。';
                     }
                   } else {
-                    return '你拆开了挡板，通风口内幽暗昏聩，像是个迷宫。保险起见，你退了出来，装回了挡板。';
+                    return '摸索了一阵，你毫无头绪。保险起见，你退了出来，装回了挡板。';
                   }
                 } else {
                   return '你迟疑着，没有动作。';
@@ -701,7 +741,6 @@ export function apply(ctx: Context) {
             } else {
               return '没有特别的发现。';
             }
-
           } else {
             return '没有特别的发现。';
           }
@@ -762,7 +801,7 @@ export function apply(ctx: Context) {
             if (electrical.locked = true) {
               await session.send('通往电气室的门是锁着的。门把手是简单的旋转式，看起来不是很牢固，中间有一个钥匙孔。');
               await session.send('你准备想办法把门弄开。（输入准备使用的道具或方式）');
-              const choice = await session.prompt(10000);
+              const choice = await session.prompt(15000);
               if (choice === '回形针' && state.inventory.includes('回形针')) {
                 response += '你使用回形针作为撬锁工具强行开门。';
                 response += '\n\n门嘎吱作响地打开了，映入眼帘的是一个狭小的房间，空气中弥漫着一股霉味。';
@@ -815,7 +854,7 @@ export function apply(ctx: Context) {
                   },
                 ]);
               } else {
-                return '你想了想，没找到好方法。';
+                return '你想了又想，没找到好方法。';
               }
             } else {
               response += '没有特别的发现。';
@@ -825,7 +864,7 @@ export function apply(ctx: Context) {
             const office = rooms.find(room => room.id === 'hide');
             if (office.locked = true) {
               await session.send('办公室的门被一个牢固的电子锁锁住，旁边有一个指纹读取器。');
-              if (state.doneTasks.includes('电力')) {
+              if (state.doneTasks.includes('房间电')) {
                 await session.send('你试了试自己的指纹，读取器闪烁红灯，门并未打开。');
                 if (state.inventory.includes('手')) {
                   await session.send('你想起之前在化学实验室造出的那只手，要试试吗？（是/否）');
@@ -886,11 +925,11 @@ export function apply(ctx: Context) {
               response += '你打开水龙头，清水汩汩流淌。你随时都能取到水。';
             }
 
-          } else if (/咖啡机/.test(point)) {
-            if (state.doneTasks.includes('电力')) {
+          } else if (/咖啡/.test(point)) {
+            if (state.doneTasks.includes('房间电')) {
               if (!state.inventory.includes('咖啡')) {
                 if (state.inventory.includes('咖啡杯') && state.inventory.includes('咖啡壶') && state.inventory.includes('滤纸') && state.doneTasks.includes('水')) {
-                  await session.send('你获得了足够的物资，要做一杯咖啡吗？（是/否）');
+                  await session.send('你发现手里的东西似乎足够做一杯咖啡，要做吗？（是/否）');
                   const choice = await session.prompt(10000);
                   if (choice === '是') {
                     await addItemToInventory(session, '咖啡');
@@ -964,13 +1003,44 @@ export function apply(ctx: Context) {
             }
 
           } else if (/电话/.test(point)) {
-            response += '';
+            if (state.doneTasks.includes('房间电')) {
+              await session.send('你拿起听筒，里面的电流声似乎催促着你输入号码。');
+              if (state.doneTasks.includes('电话号码')) {
+                await session.send('你猛然想起似乎在什么地方看到过一些数字。\n（输入你觉得正确的号码）');
+                const choice = await session.prompt(10000);
+                if (choice === '099174190') {
+                  await session.send('听筒里电流声消失，却传来刺耳的声音。你仔细分辨，才明白对方说的是：\n\n“你是谁？”');
+                  await session.send('你思考着怎么回答。（输入你觉得正确的文字）');
+                  const choice = await session.prompt(10000);
+                  if (/vanderboom/.test(choice)) {
+                    response += '沉默了一会，你听到听筒里发出声音：\n\n“3141”';
+                    await addTaskToDoneTasks(session, '电脑密码');
+                  } else {
+                    return '听筒里安静了一会，变成了滋滋的电流声。';
+                  }
+                } else if (choice === '110') {
+                  return '你输入报警电话，没有任何反应。这似乎是个与世隔绝的地方。';
+                } else if (choice === '119') {
+                  return '你输入火警电话，没有任何反应。这似乎是个与世隔绝的地方。';
+                } else if (choice === '120') {
+                  return '你输入急救电话，没有任何反应。这似乎是个与世隔绝的地方。';
+                } else {
+                  return '你输入号码，没有任何反应。';
+                }
+              } else {
+                return '你想不到可以拨打的号码，索性把听筒放了回去。';
+              }
+            } else {
+              response += '电话似乎没有通电，没有任何反应。';
+            }
 
           } else if (/通风口/.test(point)) {
-            response += '';
+            response += '天花板上有一个小通风口，位置很高。';
+            response += '\n\n你站在高处往里看，但没有任何发现。';
 
           } else if (/监控/.test(point) || /摄像/.test(point)) {
-            response += '';
+            response += '摄像头静止地悬挂在天花板上，以一种令人不安的姿态注视着你。';
+            response += '\n\n你试着拨弄它，但它坚固的金属框架可以使它免受任何损害。';
 
           } else {
             return '没有特别的发现。';
@@ -978,11 +1048,83 @@ export function apply(ctx: Context) {
         }
 
         if (currentRoom.id === 'laboratory') {
-          if (/实验台/.test(point)) {
-            response += '';
+          if (/实验台/.test(point) || /桌/.test(point)) {
+            await session.send('一张简单的桌子当做实验台，上面固定着一个本生灯，需要火柴才能点燃。');
+            if (!state.inventory.includes('咖啡壶')) {
+              await session.send('你看了看桌面，拿走了咖啡杯和咖啡壶。\n（可在物品指令中查看）');
+              await addItemToInventory(session, '咖啡杯');
+              await addItemToInventory(session, '咖啡壶');
+              if (!state.inventory.includes('回形针')) {
+                await session.send('实验台右侧有两个抽屉，要拉开看看吗？（是/否）');
+                const choice = await session.prompt(10000);
+                if (choice === '是') {
+                  response += '上面的抽屉里有一本写有实验说明的笔记本和一个装满火柴的火柴盒。';
+                  response += h.image(images.description);
+                  await addItemToInventory(session, '实验说明');
+                  await addItemToInventory(session, '火柴盒');
+                  response += '\n\n下面的抽屉里面有几张松散的、空白的纸张和一个装有几枚回形针的小盒子。';
+                  await addItemToInventory(session, '回形针');
+                  response += '\n\n你拿走了实验说明、火柴盒和回形针。\n（可在物品指令中查看）';
+                } else {
+                  return '你迟疑着，没有动作。';
+                }
+              } else {
+                return '没有特别的发现。';
+              }
+            } else {
+              return '没有特别的发现。';
+            }
+
+          } else if (/灯/.test(point)) {
+            await session.send('需要火柴才能点燃的本生灯，里面有充足的酒精。');
+            if (state.inventory.includes('火柴盒')) {
+              if (state.inventory.includes('黑色混合物')) {
+                await session.send('你点燃了本生灯，似乎可以用来加热什么东西。你猛然想到刚做出来的那一杯黑色混合物。要试试吗？（是/否）');
+                const choice = await session.prompt(10000);
+                if (choice === '是') {
+                  response += '你将混合物加热，完成了这个实验。';
+                  response += '\n\n混合物开始剧烈地膨胀、起泡，你不自觉地往后退了一步。';
+                  response += '\n\n烧杯突然破裂，有什么湿漉漉的东西掉在了地上。';
+                  response += '\n\n你定睛一看，混合物消失了，取而代之的是躺在地上的，一只抽搐着的人手。';
+                  response += '\n\n你强忍不适把它捡了起来。它似乎轻抚过你的手背。\n（可在物品指令中查看）';
+                  await removeItemFromInventory(session, '黑色混合物');
+                  await addItemToInventory(session, '手');
+                } else {
+                  return '你迟疑着，没有动作。';
+                }
+              } else {
+                response += '你试着点燃了本生灯，又百无聊赖地熄灭了它。';
+              }
+            } else {
+              response += '你没有火柴，安全起见，就不对酒精做什么了。';
+            }
+
+          } else if (/抽屉/.test(point)) {
+            if (!state.inventory.includes('回形针')) {
+              response += '你拉开实验台右侧的两个抽屉。';
+              response += '\n\n上面的抽屉里有一本写有实验说明的笔记本和一个装满火柴的火柴盒。';
+              response += h.image(images.description);
+              await addItemToInventory(session, '实验说明');
+              await addItemToInventory(session, '火柴盒');
+              response += '\n\n下面的抽屉里面有几张松散的、空白的纸张和一个装有几枚回形针的小盒子。';
+              await addItemToInventory(session, '回形针');
+              response += '\n\n你拿走了实验说明、火柴盒和回形针。\n（可在物品指令中查看）';
+            } else {
+              response += '没有特别的发现。';
+            }
+
+          } else if (/架/.test(point)) {
+            response += '架子上有一些玻璃制品，你拿了一个烧杯。';
+            await addItemToInventory(session, '烧杯');
 
           } else if (/通风口/.test(point)) {
-            response += '';
+            response += '天花板上有一个小通风口，位置很高。';
+            response += '\n\n你往通风口里看了一眼，差点跌落，因为你看到两只发光的眼睛正从另一侧盯着你。';
+            response += '\n\n。随后，那双眼睛消失在通风口深处，你听到墙内有什么东西在跌跌撞撞地移动，直到那声音消失在远处。';
+
+          } else if (/监控/.test(point) || /摄像/.test(point)) {
+            response += '摄像头静止地悬挂在天花板上，以一种令人不安的姿态注视着你。';
+            response += '\n\n你试着拨弄它，但它坚固的金属框架可以使它免受任何损害。';
 
           } else {
             return '没有特别的发现。';
@@ -991,19 +1133,81 @@ export function apply(ctx: Context) {
 
         if (currentRoom.id === 'electrical') {
           if (/保险丝盒/.test(point) || /柜/.test(point)) {
-            response += '';
-
+            await session.send('你打开保险丝盒，8个插槽旁边各自画着符号。\n（可在物品指令中查看）');
+            session.send(h.image(images.fuse));
+            if (state.inventory.includes('保险丝')) {
+              await session.send('插槽C和H已经插入了保险丝。你决定调整保险丝的位置，并把之前找到的那个也放进去。');
+              await session.send('输入你想插入保险丝的三个插槽。（三个大写英文字母）');
+              const choice = await session.prompt(10000);
+              if (/A/.test(choice) && /B/.test(choice) && /G/.test(choice)) {
+                response += '你将保险丝插入插槽A、B、G。';
+                response += '\n\n放好了最后一个保险丝，你听到电流噼啪作响，伴着火花从保险丝盒中飞溅而出。';
+                response += '\n\n你头顶的灯开始一明一灭地闪烁，然后彻底点亮，照亮了整个房间。';
+                await addTaskToDoneTasks(session, '房间电');
+              } else if (/A/.test(choice) && /C/.test(choice) && /F/.test(choice)) {
+                response += '你将保险丝插入插槽A、C、F。';
+                response += '\n\n当你插入最后一个保险丝的时候，保险丝盒内火花四溅，强烈的光亮蒙蔽了你的双眼。';
+                response += '\n\n房间里的灯光闪烁了一下后便熄灭，将你彻底淹没在黑暗中。';
+                response += '\n\n远处，你听到了一个大型机械启动时发出的渐强的嗡鸣声。';
+                await addTaskToDoneTasks(session, '机器电');
+              } else {
+                return '你迟疑着，没有动作。';
+              }
+            } else {
+              response += '安全起见，你没有动它，关上了门。';
+            }
           } else if (/架/.test(point)) {
-            response += '';
+            response += '这是个铁质的空荡荡的货架。';
+            if (!state.inventory.includes('扳手')) {
+              response += '\n\n货架上只有一个扳手，你拿走了。\n（可在物品指令中查看）';
+              await addItemToInventory(session, '扳手');
+            } else {
+              response += '\n\n没有特别的发现。';
+            }
 
-          } else if (/管道/.test(point)) {
-            response += '';
+          } else if (/管/.test(point)) {
+            await session.send('管道似乎在泄漏某种散发着强烈化学气味的物质。');
+            if (!state.doneTasks.includes('酸')) {
+              if (state.inventory.includes('扳手')) {
+                await session.send('你看着刚拿到的扳手，要试着敲开管道的裂缝吗？（是/否）');
+                const choice = await session.prompt(10000);
+                if (choice === '是') {
+                  response += '你用扳手敲击管道使其松动，酸液开始滴落到地面上。';
+                  response += '\n\n你随时都能取到酸。';
+                  await addTaskToDoneTasks(session, '酸');
+                } else {
+                  return '你迟疑着，没有动作。';
+                }
+              } else {
+                return '管道上有一些裂缝，你想找个工具把它打开。';
+              }
+            } else {
+              return '裂缝已经被你打开，你随时都能取到酸。';
+            }
 
           } else if (/通风口/.test(point)) {
-            response += '';
+            await session.send('天花板上有一个小通风口，位置很高。');
+            if (!state.inventory.includes('保险丝')) {
+              await session.send('你看向通风口内部，有一个保险丝，但由于挡板格栅的缝隙太窄，手无法伸进去。');
+              if (state.inventory.includes('回形针')) {
+                await session.send('你掏出之前得到的回形针，把它拉长。要用它试试吗？（是/否）');
+                const choice = await session.prompt(10000);
+                if (choice === '是') {
+                  response += '你掏出了保险丝，一个短小的玻璃制品，里面有一节金属丝。\n（可在物品指令中查看）';
+                  await addItemToInventory(session, '隐藏密码线索');
+                } else {
+                  return '你迟疑着，没有动作。';
+                }
+              } else {
+                response += '你需要一个细长的东西。';
+              }
+            } else {
+              response += '没有特别的发现。';
+            }
 
           } else if (/污渍/.test(point) || /黑/.test(point) || /水/.test(point)) {
-            response += '';
+            response += '地面上有一块小污渍，似乎是某种腐蚀性物质损坏了地板。';
+            response += '\n\n你抬头望去，污渍刚好位于天花板的管道下方。';
 
           } else {
             return '没有特别的发现。';
@@ -1132,8 +1336,8 @@ export function apply(ctx: Context) {
         {
           id,
           currentRoom: 'electrical',
-          inventory: ["半张纸条a","半张纸条b","手电筒","隐藏密码线索","钥匙","身份证","滤纸"],
-          visitedRooms: ["bedroom","corridor","kitchen","laboratory","electrical"],
+          inventory: ["半张纸条a", "半张纸条b", "手电筒", "隐藏密码线索", "钥匙", "身份证", "滤纸"],
+          visitedRooms: ["bedroom", "corridor", "kitchen", "laboratory", "electrical"],
           doneTasks: [],
         },
       ]);
