@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-rusty-lake-lizard",
-  "description": "用机器人来玩锈湖桌游吧~",
+  "description": "交互式解谜游戏，来玩玩吧~",
   "version": "0.0.1",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -12,9 +12,11 @@
   "keywords": [
     "chatbot",
     "koishi",
+    "game",
+    "游戏",
     "plugin"
   ],
   "peerDependencies": {
-    "koishi": "4.18.2"
+    "koishi": "^4.18.2"
   }
 }
