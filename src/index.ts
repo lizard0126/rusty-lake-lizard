@@ -295,7 +295,6 @@ export function apply(ctx: Context) {
     doneTasks: 'json'
   }, {
     primary: 'id',
-    autoInc: true,
   });
 
   ctx.model.extend('rusty_lake_players', {
@@ -304,7 +303,6 @@ export function apply(ctx: Context) {
     userId: 'string',
   }, {
     primary: 'id',
-    autoInc: true,
   });
 
   const command = ctx.command('锈湖', '锈湖桌游').alias('rl');

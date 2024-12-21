@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-rusty-lake-lizard",
   "description": "交互式解谜游戏，来玩玩吧~",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lizard0126/rusty-lake-lizard.git"
@@ -22,6 +22,7 @@
     "plugin"
   ],
   "peerDependencies": {
+    "@koishijs/plugin-database-sqlite": "^4.6.0",
     "koishi": "^4.18.2"
   },
   "koishi": {
