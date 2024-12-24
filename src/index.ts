@@ -724,15 +724,16 @@ export function apply(ctx: Context) {
                 const choice = await session.prompt(5000);
                 if (choice === '是') {
                   await addTaskToDoneTasks(session, '走廊锁');
+                  const newState = await getPlayerState(session);
                   await ctx.database.upsert('rusty_lake_games', [
                     {
-                      id: state.id,
-                      gameId: state.gameId,
-                      gameName: state.gameName,
+                      id: newState.id,
+                      gameId: newState.gameId,
+                      gameName: newState.gameName,
                       currentRoom: 'corridor',
-                      inventory: state.inventory,
-                      visitedRooms: [...state.visitedRooms, 'corridor'],
-                      doneTasks: state.doneTasks,
+                      inventory: newState.inventory,
+                      visitedRooms: [...newState.visitedRooms, 'corridor'],
+                      doneTasks: newState.doneTasks,
                     },
                   ]);
                   response += '你小心翼翼地打开门，迈步走了出去。';
@@ -785,15 +786,16 @@ export function apply(ctx: Context) {
                       response += '\n\n你艰难地从桌子下面爬出来，然后就看到了嵌入进墙体里的巨型机器矗立在你眼前，一个小屏幕发出红光，显示着闪烁的消息。“';
                       response += h.image(images.hide);
                       await addTaskToDoneTasks(session, '隐藏房间锁');
+                      const newState = await getPlayerState(session);
                       await ctx.database.upsert('rusty_lake_games', [
                         {
-                          id: state.id,
-                          gameId: state.gameId,
-                          gameName: state.gameName,
+                          id: newState.id,
+                          gameId: newState.gameId,
+                          gameName: newState.gameName,
                           currentRoom: 'hide',
-                          inventory: state.inventory,
-                          visitedRooms: [...state.visitedRooms, 'hide'],
-                          doneTasks: state.doneTasks,
+                          inventory: newState.inventory,
+                          visitedRooms: [...newState.visitedRooms, 'hide'],
+                          doneTasks: newState.doneTasks,
                         },
                       ]);
                     } else {
@@ -824,15 +826,16 @@ export function apply(ctx: Context) {
               response += '\n\n你听到角落的垃圾桶周围萦绕着嗡嗡作响的苍蝇声。';
               response += h.image(images.kitchen);
               await addTaskToDoneTasks(session, '厨房锁');
+              const newState = await getPlayerState(session);
               await ctx.database.upsert('rusty_lake_games', [
                 {
-                  id: state.id,
-                  gameId: state.gameId,
-                  gameName: state.gameName,
+                  id: newState.id,
+                  gameId: newState.gameId,
+                  gameName: newState.gameName,
                   currentRoom: 'kitchen',
-                  inventory: state.inventory,
-                  visitedRooms: [...state.visitedRooms, 'kitchen'],
-                  doneTasks: state.doneTasks,
+                  inventory: newState.inventory,
+                  visitedRooms: [...newState.visitedRooms, 'kitchen'],
+                  doneTasks: newState.doneTasks,
                 },
               ]);
             } else {
@@ -848,15 +851,16 @@ export function apply(ctx: Context) {
               response += '\n\n然而一股令人不安的寒意掠过你的脊背，你总感觉有什么东西在注视着你。';
               response += h.image(images.laboratory);
               await addTaskToDoneTasks(session, '实验室锁');
+              const newState = await getPlayerState(session);
               await ctx.database.upsert('rusty_lake_games', [
                 {
-                  id: state.id,
-                  gameId: state.gameId,
-                  gameName: state.gameName,
+                  id: newState.id,
+                  gameId: newState.gameId,
+                  gameName: newState.gameName,
                   currentRoom: 'laboratory',
-                  inventory: state.inventory,
-                  visitedRooms: [...state.visitedRooms, 'laboratory'],
-                  doneTasks: state.doneTasks,
+                  inventory: newState.inventory,
+                  visitedRooms: [...newState.visitedRooms, 'laboratory'],
+                  doneTasks: newState.doneTasks,
                 },
               ]);
             } else {
@@ -874,15 +878,16 @@ export function apply(ctx: Context) {
                 response += '\n\n你看到天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。';
                 response += h.image(images.electrical);
                 await addTaskToDoneTasks(session, '电锁');
+                const newState = await getPlayerState(session);
                 await ctx.database.upsert('rusty_lake_games', [
                   {
-                    id: state.id,
-                    gameId: state.gameId,
-                    gameName: state.gameName,
+                    id: newState.id,
+                    gameId: newState.gameId,
+                    gameName: newState.gameName,
                     currentRoom: 'electrical',
-                    inventory: state.inventory,
-                    visitedRooms: [...state.visitedRooms, 'electrical'],
-                    doneTasks: state.doneTasks,
+                    inventory: newState.inventory,
+                    visitedRooms: [...newState.visitedRooms, 'electrical'],
+                    doneTasks: newState.doneTasks,
                   },
                 ]);
               } else if (choice === '身份证' && state.inventory.includes('身份证')) {
@@ -891,15 +896,16 @@ export function apply(ctx: Context) {
                 response += '\n\n你看到天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。';
                 response += h.image(images.electrical);
                 await addTaskToDoneTasks(session, '电锁');
+                const newState = await getPlayerState(session);
                 await ctx.database.upsert('rusty_lake_games', [
                   {
-                    id: state.id,
-                    gameId: state.gameId,
-                    gameName: state.gameName,
+                    id: newState.id,
+                    gameId: newState.gameId,
+                    gameName: newState.gameName,
                     currentRoom: 'electrical',
-                    inventory: state.inventory,
-                    visitedRooms: [...state.visitedRooms, 'electrical'],
-                    doneTasks: state.doneTasks,
+                    inventory: newState.inventory,
+                    visitedRooms: [...newState.visitedRooms, 'electrical'],
+                    doneTasks: newState.doneTasks,
                   },
                 ]);
               } else if (/力/.test(choice)) {
@@ -908,15 +914,16 @@ export function apply(ctx: Context) {
                 response += '\n\n你看到天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。';
                 response += h.image(images.electrical);
                 await addTaskToDoneTasks(session, '电锁');
+                const newState = await getPlayerState(session);
                 await ctx.database.upsert('rusty_lake_games', [
                   {
-                    id: state.id,
-                    gameId: state.gameId,
-                    gameName: state.gameName,
+                    id: newState.id,
+                    gameId: newState.gameId,
+                    gameName: newState.gameName,
                     currentRoom: 'electrical',
-                    inventory: state.inventory,
-                    visitedRooms: [...state.visitedRooms, 'electrical'],
-                    doneTasks: state.doneTasks,
+                    inventory: newState.inventory,
+                    visitedRooms: [...newState.visitedRooms, 'electrical'],
+                    doneTasks: newState.doneTasks,
                   },
                 ]);
               } else {
@@ -941,15 +948,16 @@ export function apply(ctx: Context) {
                     response += '\n\n房间中央有一张桌子，上面放着一台电脑，发出轻微的电流声。';
                     response += h.image(images.office);
                     await addTaskToDoneTasks(session, '办公室锁');
+                    const newState = await getPlayerState(session);
                     await ctx.database.upsert('rusty_lake_games', [
                       {
-                        id: state.id,
-                        gameId: state.gameId,
-                        gameName: state.gameName,
+                        id: newState.id,
+                        gameId: newState.gameId,
+                        gameName: newState.gameName,
                         currentRoom: 'office',
-                        inventory: state.inventory,
-                        visitedRooms: [...state.visitedRooms, 'office'],
-                        doneTasks: state.doneTasks,
+                        inventory: newState.inventory,
+                        visitedRooms: [...newState.visitedRooms, 'office'],
+                        doneTasks: newState.doneTasks,
                       },
                     ]);
                   } else {
