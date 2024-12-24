@@ -89,7 +89,6 @@ interface Room {
   name: string;
   description: string;
   image?: string;
-  locked: boolean;
 }
 
 const rooms: Room[] = [
@@ -98,49 +97,42 @@ const rooms: Room[] = [
     name: '卧室',
     description: '这是一个黑暗的、方形的、铺着白色瓷砖的房间。',
     image: images.bedroom,
-    locked: false,
   },
   {
     id: 'corridor',
     name: '走廊',
     description: '这是一条长长的、昏暗的走廊，尽头分成两条岔路。',
     image: images.corridor,
-    locked: true,
   },
   {
     id: 'kitchen',
     name: '厨房',
     description: '这里摆着一张桌子和一个厨台。',
     image: images.kitchen,
-    locked: true,
   },
   {
     id: 'laboratory',
     name: '化学实验室',
     description: '这里出奇的空旷——里面只有一个小型实验台立在房间中央，上面摆着少量化学设备。',
     image: images.laboratory,
-    locked: true,
   },
   {
     id: 'electrical',
     name: '电气室',
     description: '空气中弥漫着一股霉味，天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。',
     image: images.electrical,
-    locked: true,
   },
   {
     id: 'office',
     name: '办公室',
     description: '简朴干净的白色墙纸与遍布整座设施的冰冷单调的白色瓷砖形成了鲜明的对比。房间中央有一张桌子，上面放着一台电脑，发出轻微的电流声。',
     image: images.office,
-    locked: true,
   },
   {
     id: 'hide',
     name: '隐藏房间',
     description: '从布满灰尘的通风口爬出来，到了一个黑暗房间的冰冷地板上。嵌入进墙体里的巨型机器矗立在你眼前，一个小屏幕发出红光，显示着闪烁的消息。',
     image: images.hide,
-    locked: true,
   },
 ];
 
@@ -373,6 +365,13 @@ export function apply(ctx: Context) {
       logger.info(`用户 ${session.userId} 已加入房间 ${gameName}`);
 
       await session.send(`成功创建房间：${gameName}。\n已自动为您加入`);
+
+      const state = await getPlayerState(session);
+      const currentRoom = state.currentRoom;
+      const current = rooms.find(r => r.id === currentRoom);
+
+      await session.send(`当前所在场景：${current.name}\n使用“锈湖 查看”指令查看当前场景。例如：“锈湖 查看 监控”`);
+      await session.send(h.image(current.image));
     });
 
   command
@@ -450,6 +449,13 @@ export function apply(ctx: Context) {
         userId: session.userId,
       });
       await session.send(`你成功加入了房间：${games[index].gameName}！`);
+
+      const state = await getPlayerState(session);
+      const currentRoom = state.currentRoom;
+      const current = rooms.find(r => r.id === currentRoom);
+
+      await session.send(`当前所在场景：${current.name}\n使用“锈湖 查看”指令查看当前场景。例如：“锈湖 查看 监控”`);
+      await session.send(h.image(current.image));
     });
 
   command
@@ -711,14 +717,13 @@ export function apply(ctx: Context) {
             }
 
           } else if (/门/.test(point)) {
-            const corridor = rooms.find(room => room.id === 'corridor');
-            if (corridor.locked === true) {
+            if (!state.doneTasks.includes('走廊锁')) {
               await session.send('这扇装有坚固的金属门把手的白门被锁上了，需要钥匙才能开。');
               if (state.inventory.includes('钥匙')) {
                 await session.send('你拥有钥匙。要试着开门吗？（是/否）');
                 const choice = await session.prompt(5000);
                 if (choice === '是') {
-                  corridor.locked = false;
+                  await addTaskToDoneTasks(session, '走廊锁');
                   await ctx.database.upsert('rusty_lake_games', [
                     {
                       id: state.id,
@@ -758,8 +763,7 @@ export function apply(ctx: Context) {
             response += '\n\n你试着拨弄它，但它坚固的金属框架可以使它免受任何损害。';
 
           } else if (/通风/.test(point)) {
-            const hide = rooms.find(room => room.id === 'hide');
-            if (hide.locked === true) {
+            if (!state.doneTasks.includes('隐藏房间锁')) {
               await session.send('通风口被一块挡板覆盖，挡板被螺丝固定在墙上。');
               if (state.inventory.includes('螺丝刀')) {
                 await session.send('你拥有螺丝刀。要试着拆开挡板吗？（是/否）');
@@ -780,7 +784,7 @@ export function apply(ctx: Context) {
                       response += '\n\n你设法打开通风口，从布满灰尘的通风口爬出来，到了一个黑暗房间的冰冷地板上，脑袋差点撞到上方的桌子。';
                       response += '\n\n你艰难地从桌子下面爬出来，然后就看到了嵌入进墙体里的巨型机器矗立在你眼前，一个小屏幕发出红光，显示着闪烁的消息。“';
                       response += h.image(images.hide);
-                      hide.locked = false;
+                      await addTaskToDoneTasks(session, '隐藏房间锁');
                       await ctx.database.upsert('rusty_lake_games', [
                         {
                           id: state.id,
@@ -813,14 +817,13 @@ export function apply(ctx: Context) {
 
         } else if (currentRoom.id === 'corridor') {
           if (/厨房/.test(point)) {
-            const kitchen = rooms.find(room => room.id === 'hide');
-            if (kitchen.locked === true) {
+            if (!state.doneTasks.includes('厨房锁')) {
               response += '厨房的门没锁，你开门走了进去。';
               response += '\n\n你走进厨房，面前是一张小桌子和一把椅子。';
               response += '\n\n远端的墙上有一个厨台，上面放着一个咖啡机。';
               response += '\n\n你听到角落的垃圾桶周围萦绕着嗡嗡作响的苍蝇声。';
               response += h.image(images.kitchen);
-              kitchen.locked = false;
+              await addTaskToDoneTasks(session, '厨房锁');
               await ctx.database.upsert('rusty_lake_games', [
                 {
                   id: state.id,
@@ -837,15 +840,14 @@ export function apply(ctx: Context) {
             }
 
           } else if (/实验室/.test(point)) {
-            const laboratory = rooms.find(room => room.id === 'hide');
-            if (laboratory.locked === true) {
+            if (!state.doneTasks.includes('实验室锁')) {
               response += '你来到化学实验室门口。';
               response += '\n\n当你靠近门边时，嗅到了从另外一侧传来的浓烈化学气味，直冲鼻腔。';
               response += '\n\n门没锁，你开门走了进去。';
               response += '\n\n化学实验室出奇地空旷——里面只有一个小型实验台立在房间中央，上面摆着少量化学设备。';
               response += '\n\n然而一股令人不安的寒意掠过你的脊背，你总感觉有什么东西在注视着你。';
               response += h.image(images.laboratory);
-              laboratory.locked = false;
+              await addTaskToDoneTasks(session, '实验室锁');
               await ctx.database.upsert('rusty_lake_games', [
                 {
                   id: state.id,
@@ -862,8 +864,7 @@ export function apply(ctx: Context) {
             }
 
           } else if (/电/.test(point)) {
-            const electrical = rooms.find(room => room.id === 'hide');
-            if (electrical.locked === true) {
+            if (!state.doneTasks.includes('电锁')) {
               await session.send('通往电气室的门是锁着的。门把手是简单的旋转式，看起来不是很牢固，中间有一个钥匙孔。');
               await session.send('你准备想办法把门弄开。（输入准备使用的道具或方式）');
               const choice = await session.prompt(15000);
@@ -872,7 +873,7 @@ export function apply(ctx: Context) {
                 response += '\n\n门嘎吱作响地打开了，映入眼帘的是一个狭小的房间，空气中弥漫着一股霉味。';
                 response += '\n\n你看到天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。';
                 response += h.image(images.electrical);
-                electrical.locked = false;
+                await addTaskToDoneTasks(session, '电锁');
                 await ctx.database.upsert('rusty_lake_games', [
                   {
                     id: state.id,
@@ -889,7 +890,7 @@ export function apply(ctx: Context) {
                 response += '\n\n门嘎吱作响地打开了，映入眼帘的是一个狭小的房间，空气中弥漫着一股霉味。';
                 response += '\n\n你看到天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。';
                 response += h.image(images.electrical);
-                electrical.locked = false;
+                await addTaskToDoneTasks(session, '电锁');
                 await ctx.database.upsert('rusty_lake_games', [
                   {
                     id: state.id,
@@ -906,7 +907,7 @@ export function apply(ctx: Context) {
                 response += '\n\n门嘎吱作响地打开了，映入眼帘的是一个狭小的房间，空气中弥漫着一股霉味。';
                 response += '\n\n你看到天花板上布满了管道和电线，房间中央有一个大型保险丝盒，旁边是一个近乎空荡的货架，上面积满了灰尘。';
                 response += h.image(images.electrical);
-                electrical.locked = false;
+                await addTaskToDoneTasks(session, '电锁');
                 await ctx.database.upsert('rusty_lake_games', [
                   {
                     id: state.id,
@@ -926,8 +927,7 @@ export function apply(ctx: Context) {
             }
 
           } else if (/办公室/.test(point)) {
-            const office = rooms.find(room => room.id === 'hide');
-            if (office.locked === true) {
+            if (!state.doneTasks.includes('办公室锁')) {
               await session.send('办公室的门被一个牢固的电子锁锁住，旁边有一个指纹读取器。');
               if (state.doneTasks.includes('房间电')) {
                 await session.send('你试了试自己的指纹，读取器闪烁红灯，门并未打开。');
@@ -940,7 +940,7 @@ export function apply(ctx: Context) {
                     response += '\n\n简朴干净的白色墙纸与遍布整座设施的冰冷单调的白色瓷砖形成了鲜明的对比。';
                     response += '\n\n房间中央有一张桌子，上面放着一台电脑，发出轻微的电流声。';
                     response += h.image(images.office);
-                    office.locked = false;
+                    await addTaskToDoneTasks(session, '办公室锁');
                     await ctx.database.upsert('rusty_lake_games', [
                       {
                         id: state.id,
@@ -1212,7 +1212,6 @@ export function apply(ctx: Context) {
               await session.send('插槽C和H已经插入了保险丝。你决定调整保险丝的位置，并把之前找到的那个也放进去。');
               await session.send('输入你想插入保险丝的三个插槽。（三个大写英文字母）');
               const choice = await session.prompt(15000);
-              const hide = rooms.find(room => room.id === 'hide');
               if (/A/.test(choice) && /B/.test(choice) && /G/.test(choice) && !state.doneTasks.includes('房间电')) {
                 response += '你将保险丝插入插槽A、B、G。';
                 response += '\n\n放好了最后一个保险丝，你听到电流噼啪作响，伴着火花从保险丝盒中飞溅而出。';
